@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morpion géant</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&display=swap">
+<style>
+:root{
+  --bg:#E8EDEA; --paper:#F7F9F7; --ink:#1D2A31; --muted:#5C6B70; --line:#9FAEAB;
+  --x:#2A55E5; --o:#D0306B; --hl:#FFEBAE; --hlline:#E2A900; --veil:rgba(247,249,247,.9);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A1E; --paper:#1C272C; --ink:#E6EEEC; --muted:#93A3A6; --line:#3A4A50;
+    --x:#7C9BFF; --o:#FF7DA8; --hl:#3A3516; --hlline:#E2B72E; --veil:rgba(28,39,44,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121A1E; --paper:#1C272C; --ink:#E6EEEC; --muted:#93A3A6; --line:#3A4A50;
+  --x:#7C9BFF; --o:#FF7DA8; --hl:#3A3516; --hlline:#E2B72E; --veil:rgba(28,39,44,.9);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  scroll-padding-top:env(safe-area-inset-top,0px)}
+body{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:14px 12px 28px}
+h1{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:1.6rem;
+  letter-spacing:-.02em;margin:6px 0 10px}
+.panel{display:flex;flex-direction:column;gap:8px;width:min(100%,560px);margin-bottom:12px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper)}
+.seg button{flex:1;font:inherit;font-size:.9rem;font-weight:600;padding:9px 6px;border:0;
+  background:transparent;color:var(--ink);cursor:pointer;min-width:0}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button:focus-visible{outline:2px solid var(--hlline);outline-offset:-3px}
+.status{display:flex;align-items:center;gap:10px;min-height:56px;width:min(100%,560px);
+  padding:10px 14px;border-radius:10px;background:var(--paper);border:1px solid var(--line);
+  font-size:.98rem;line-height:1.35;margin-bottom:12px}
+.status svg{width:26px;height:26px;flex:none}
+.status small{display:block;color:var(--muted);font-size:.84rem}
+.x{color:var(--x)} .o{color:var(--o)}
+.big{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(100%,560px);aspect-ratio:1}
+.mini{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;
+  background:var(--line);border-radius:7px;min-width:0;transition:background .15s}
+.mini.active{background:var(--hlline);box-shadow:0 0 0 3px var(--hlline)}
+.mini.done .cell{opacity:.35}
+.cell{background:var(--paper);border:0;margin:0;padding:0;min-width:0;aspect-ratio:1;
+  display:flex;align-items:center;justify-content:center;cursor:default;color:inherit;font:inherit}
+.cell svg{width:64%;height:64%}
+.cell.can{cursor:pointer}
+.mini.active .cell.can{background:var(--hl)}
+.cell.can:hover,.cell.can:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.cell.last{box-shadow:inset 0 0 0 2px var(--ink)}
+.veil{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:var(--veil);border-radius:7px;pointer-events:none}
+.veil svg{width:78%;height:78%}
+.veil.draw{color:var(--muted);font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:2.2rem}
+.actions{display:flex;gap:10px;margin-top:16px}
+button.ctl{font:inherit;font-weight:600;padding:10px 16px;border-radius:10px;cursor:pointer;
+  background:var(--paper);color:var(--ink);border:1px solid var(--line)}
+button.ctl:hover{border-color:var(--ink)}
+button.ctl:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+details{width:min(100%,560px);margin-top:18px;color:var(--muted);font-size:.92rem;line-height:1.5}
+summary{cursor:pointer;color:var(--ink);font-weight:600}
+details ul{padding-left:1.1rem;margin:8px 0 0}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<h1>Morpion géant</h1>
+
+<div class="panel">
+  <div class="seg" id="segMode" role="group" aria-label="Mode de jeu">
+    <button data-v="2j">2 joueurs</button>
+    <button data-v="bot">Contre le bot</button>
+  </div>
+  <div id="botOpts" class="panel" style="margin:0">
+    <div class="seg" id="segLevel" role="group" aria-label="Difficulté">
+      <button data-v="facile">Facile</button>
+      <button data-v="moyen">Moyen</button>
+      <button data-v="difficile">Difficile</button>
+      <button data-v="extreme">Extrême</button>
+    </div>
+    <div class="seg" id="segSide" role="group" aria-label="Ton symbole">
+      <button data-v="X">Je joue Croix (1er)</button>
+      <button data-v="O">Je joue Rond (2e)</button>
+    </div>
+  </div>
+</div>
+
+<div class="status" id="status" aria-live="polite"></div>
+<div class="big" id="big"></div>
+<div class="actions">
+  <button class="ctl" id="undo">Annuler le coup</button>
+  <button class="ctl" id="reset">Nouvelle partie</button>
+</div>
+<details>
+  <summary>Règles</summary>
+  <ul>
+    <li>Le premier coup se joue où vous voulez.</li>
+    <li>La case que vous choisissez dans une petite grille décide de la grille où l'adversaire doit jouer.</li>
+    <li>Si cette grille est déjà gagnée ou pleine, l'adversaire joue où il veut.</li>
+    <li>Aligner 3 symboles dans une petite grille la gagne. Gagner 3 petites grilles alignées gagne la partie.</li>
+    <li>Changer le mode, la difficulté ou le symbole relance une partie.</li>
+  </ul>
+</details>
+
+<script>
+const LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+/*ENGINE-START*/
+// Moteur du bot : 0 = vide, 1 = Croix, 2 = Rond. Grille b (0-8), case c (0-8), coup m = b*9+c.
+const LT=[0,1,2,3,4,5,6,7,8].map(c=>LINES.filter(l=>l.includes(c)));
+const OTH=LT.map((ls,c)=>ls.map(l=>l.filter(x=>x!==c)));
+const BW=[3,2,3,2,4,2,3,2,3];
+const CW=[2,1,2,1,3,1,2,1,2];
+const INF=1e9, WIN=100000;
+const E={cells:new Int8Array(81),won:new Int8Array(9),filled:new Int8Array(9),
+         forced:-1,turn:1,over:0,done:0,stk:new Int32Array(5*200),sp:0};
+let nodes=0, deadline=0, aborted=false;
+
+function loadEngine(st){
+  for(let b=0;b<9;b++){
+    let f=0;
+    for(let c=0;c<9;c++){
+      const v=st.cells[b][c];
+      E.cells[b*9+c]=v==='X'?1:v==='O'?2:0;
+      if(v) f++;
+    }
+    E.filled[b]=f;
+    const w=st.won[b];
+    E.won[b]=w===null?0:w==='X'?1:w==='O'?2:3;
+  }
+  E.forced=st.forced===null?-1:st.forced;
+  E.turn=st.turn==='X'?1:2;
+  E.over=0; E.sp=0;
+  let d=0; for(let b=0;b<9;b++) if(E.won[b]) d++;
+  E.done=d;
+}
+function genMoves(){
+  const mv=[];
+  if(E.forced>=0){
+    const o=E.forced*9;
+    for(let c=0;c<9;c++) if(!E.cells[o+c]) mv.push(o+c);
+  } else {
+    for(let b=0;b<9;b++) if(E.won[b]===0){
+      const o=b*9;
+      for(let c=0;c<9;c++) if(!E.cells[o+c]) mv.push(o+c);
+    }
+  }
+  return mv;
+}
+function make(m){
+  const b=(m/9)|0, c=m-b*9, p=E.turn, o=b*9;
+  const s=E.stk, i=E.sp; E.sp+=5;
+  s[i]=m; s[i+1]=E.won[b]; s[i+2]=E.forced; s[i+3]=E.over; s[i+4]=E.done;
+  E.cells[m]=p; E.filled[b]++;
+  if(E.won[b]===0){
+    let w=false;
+    const ls=LT[c];
+    for(let k=0;k<ls.length;k++){
+      const l=ls[k];
+      if(E.cells[o+l[0]]===p&&E.cells[o+l[1]]===p&&E.cells[o+l[2]]===p){w=true;break;}
+    }
+    if(w){
+      E.won[b]=p; E.done++;
+      const bl=LT[b];
+      for(let k=0;k<bl.length;k++){
+        const l=bl[k];
+        if(E.won[l[0]]===p&&E.won[l[1]]===p&&E.won[l[2]]===p){E.over=p;break;}
+      }
+    } else if(E.filled[b]===9){E.won[b]=3;E.done++;}
+    if(!E.over&&E.done===9) E.over=3;
+  }
+  E.forced=E.won[c]!==0?-1:c;
+  E.turn=3-p;
+}
+function unmake(){
+  E.sp-=5; const s=E.stk, i=E.sp;
+  const m=s[i], b=(m/9)|0;
+  E.cells[m]=0; E.filled[b]--;
+  E.won[b]=s[i+1]; E.forced=s[i+2]; E.over=s[i+3]; E.done=s[i+4];
+  E.turn=3-E.turn;
+}
+function evalX(){
+  let s=0; const cl=E.cells, wn=E.won;
+  for(let b=0;b<9;b++){
+    const w=wn[b];
+    if(w===1) s+=14*BW[b]; else if(w===2) s-=14*BW[b];
+    else if(w===0){
+      const o=b*9;
+      for(let c=0;c<9;c++){const v=cl[o+c]; if(v===1) s+=CW[c]; else if(v===2) s-=CW[c];}
+      for(let i=0;i<8;i++){
+        const l=LINES[i]; let x=0,y=0;
+        for(let k=0;k<3;k++){const v=cl[o+l[k]]; if(v===1)x++; else if(v===2)y++;}
+        if(y===0&&x===2) s+=4+BW[b]; else if(x===0&&y===2) s-=4+BW[b];
+      }
+    }
+  }
+  for(let i=0;i<8;i++){
+    const l=LINES[i]; let x=0,y=0,d=0;
+    for(let k=0;k<3;k++){const w=wn[l[k]]; if(w===1)x++; else if(w===2)y++; else if(w===3)d++;}
+    if(d===0){
+      if(y===0&&x>0) s+=x===1?18:90;
+      else if(x===0&&y>0) s-=y===1?18:90;
+    }
+  }
+  if(E.forced===-1) s+=E.turn===1?6:-6;
+  return s;
+}
+function moveScore(m){
+  const c=m%9, p=E.turn, o=3-p, b=(m/9)|0, base=b*9;
+  let s=CW[c];
+  const ot=OTH[c];
+  for(let k=0;k<ot.length;k++){
+    const a=E.cells[base+ot[k][0]], d=E.cells[base+ot[k][1]];
+    if(a===p&&d===p) s+=60; else if(a===o&&d===o) s+=25;
+  }
+  if(E.won[c]!==0) s-=15;
+  return s;
+}
+function ordered(){
+  const mv=genMoves();
+  return mv.map(m=>[moveScore(m),m]).sort((a,b)=>b[0]-a[0]).map(x=>x[1]);
+}
+function search(depth,alpha,beta,ply){
+  if((++nodes&511)===0&&performance.now()>deadline) aborted=true;
+  if(aborted) return 0;
+  if(E.over){ return E.over===3?0:-(WIN-ply); }
+  if(depth===0){ const e=evalX(); return E.turn===1?e:-e; }
+  const mv=ordered();
+  if(!mv.length) return 0;
+  let best=-INF;
+  for(let i=0;i<mv.length;i++){
+    make(mv[i]);
+    const sc=-search(depth-1,-beta,-alpha,ply+1);
+    unmake();
+    if(aborted) return 0;
+    if(sc>best) best=sc;
+    if(best>alpha) alpha=best;
+    if(alpha>=beta) break;
+  }
+  return best;
+}
+const LEVELS={
+  facile:{random:true},
+  moyen:{maxDepth:2,ms:400,noise:0.25},
+  difficile:{maxDepth:4,ms:900,noise:0},
+  extreme:{maxDepth:40,ms:2800,noise:0}
+};
+function think(st,level){
+  loadEngine(st);
+  const moves0=ordered();
+  const cfg=LEVELS[level]||LEVELS.moyen;
+  if(cfg.random||(cfg.noise&&Math.random()<cfg.noise)) {
+    return {move:moves0[Math.floor(Math.random()*moves0.length)],depth:0};
+  }
+  const t0=performance.now();
+  let moves=moves0.slice(), bestMove=moves[0], reached=0;
+  for(let d=1;d<=cfg.maxDepth;d++){
+    deadline=t0+cfg.ms; aborted=false; nodes=0;
+    let alpha=-INF, bestScore=-INF, bm=moves[0];
+    for(let i=0;i<moves.length;i++){
+      make(moves[i]);
+      const sc=-search(d-1,-INF,-alpha,1);
+      unmake();
+      if(aborted) break;
+      if(sc>bestScore){bestScore=sc;bm=moves[i];}
+      if(bestScore>alpha) alpha=bestScore;
+    }
+    if(aborted) break;
+    bestMove=bm; reached=d;
+    moves=[bm].concat(moves.filter(x=>x!==bm));
+    if(Math.abs(bestScore)>WIN-100) break;
+  }
+  return {move:bestMove,depth:reached};
+}
+/*ENGINE-END*/
+
+const NAME={X:"Croix",O:"Rond"};
+const LEVEL_LABEL={facile:"Facile",moyen:"Moyen",difficile:"Difficile",extreme:"Extrême"};
+const XS='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5L19 19M19 5L5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
+const OS='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="3" fill="none"/></svg>';
+const mark=p=>p==='X'?XS:OS;
+
+let st, stack=[];
+let mode='bot', level='difficile', human='X';
+let thinking=false, gen=0, botInfo='';
+const big=document.getElementById('big');
+const statusEl=document.getElementById('status');
+const undoBtn=document.getElementById('undo');
+const botSide=()=>human==='X'?'O':'X';
+const botTurn=()=>mode==='bot'&&st.turn===botSide();
+
+function fresh(){
+  return {cells:Array.from({length:9},()=>Array(9).fill(null)),won:Array(9).fill(null),
+          turn:'X',forced:null,over:null,last:null};
+}
+function winner(a){
+  for(const [i,j,k] of LINES){
+    if(a[i]&&a[i]!=='D'&&a[i]===a[j]&&a[i]===a[k]) return a[i];
+  }
+  return null;
+}
+function playable(b,c){
+  return !st.over && st.cells[b][c]===null && st.won[b]===null && (st.forced===null||st.forced===b);
+}
+function play(b,c){
+  if(!playable(b,c)) return;
+  stack.push(structuredClone(st));
+  const p=st.turn;
+  st.cells[b][c]=p;
+  st.last=[b,c];
+  const w=winner(st.cells[b]);
+  if(w) st.won[b]=w;
+  else if(st.cells[b].every(Boolean)) st.won[b]='D';
+  const g=winner(st.won);
+  if(g) st.over=g;
+  else if(st.won.every(Boolean)) st.over='D';
+  st.forced = st.won[c]!==null ? null : c;
+  st.turn = p==='X'?'O':'X';
+  render();
+  maybeBot();
+}
+function maybeBot(){
+  if(!botTurn()||st.over||thinking) return;
+  const myGen=gen;
+  thinking=true; render();
+  requestAnimationFrame(()=>setTimeout(()=>{
+    if(myGen!==gen) return;
+    const t0=performance.now();
+    const r=think(st,level);
+    const wait=Math.max(0,450-(performance.now()-t0));
+    setTimeout(()=>{
+      if(myGen!==gen) return;
+      thinking=false;
+      botInfo=r.depth?`Le bot a regardé ${r.depth} coup${r.depth>1?'s':''} d'avance.`:'';
+      play(Math.floor(r.move/9),r.move%9);
+    },wait);
+  },40));
+}
+function render(){
+  big.innerHTML='';
+  const humanTurn=!st.over&&!botTurn();
+  for(let b=0;b<9;b++){
+    const m=document.createElement('div');
+    const active=!st.over && st.won[b]===null && (st.forced===null||st.forced===b);
+    m.className='mini'+(active?' active':'')+(st.won[b]?' done':'');
+    for(let c=0;c<9;c++){
+      const cell=document.createElement('button');
+      const v=st.cells[b][c];
+      const can=humanTurn&&playable(b,c);
+      cell.className='cell'+(v?' '+v.toLowerCase():'')+(can?' can':'')+
+        (st.last&&st.last[0]===b&&st.last[1]===c?' last':'');
+      cell.setAttribute('aria-label',`Grille ${b+1}, case ${c+1}`+(v?`, ${NAME[v]}`:''));
+      cell.tabIndex=can?0:-1;
+      if(!can) cell.setAttribute('aria-disabled','true');
+      if(v) cell.innerHTML=mark(v);
+      cell.addEventListener('click',()=>{ if(!thinking&&!botTurn()) play(b,c); });
+      m.appendChild(cell);
+    }
+    const w=st.won[b];
+    if(w){
+      const v=document.createElement('div');
+      v.className='veil'+(w==='D'?' draw':'')+(w==='X'?' x':w==='O'?' o':'');
+      v.innerHTML = w==='D' ? '=' : mark(w);
+      m.appendChild(v);
+    }
+    big.appendChild(m);
+  }
+  let html;
+  if(st.over==='D'){
+    html='<div>Match nul<small>Toutes les grilles sont terminées sans alignement.</small></div>';
+  } else if(st.over){
+    const title = mode==='bot'
+      ? (st.over===human ? 'Tu as gagné !' : 'Le bot a gagné.')
+      : `Victoire des ${NAME[st.over]}s !`;
+    html=`<span class="${st.over.toLowerCase()}">${mark(st.over)}</span><div>${title}<small>Trois grilles alignées.</small></div>`;
+  } else if(thinking){
+    html=`<span class="${st.turn.toLowerCase()}">${mark(st.turn)}</span><div>Le bot réfléchit…<small>Niveau ${LEVEL_LABEL[level]}</small></div>`;
+  } else {
+    const where = st.forced===null
+      ? 'Jouez dans n\'importe quelle grille disponible.'
+      : 'Jouez dans la grille en surbrillance.';
+    const who = mode==='bot' ? 'À toi de jouer' : `Au tour des ${NAME[st.turn]}s`;
+    const extra = mode==='bot'&&botInfo ? ' '+botInfo : '';
+    html=`<span class="${st.turn.toLowerCase()}">${mark(st.turn)}</span><div>${who}<small>${where}${extra}</small></div>`;
+  }
+  statusEl.innerHTML=html;
+  undoBtn.disabled=stack.length===0||thinking;
+}
+function newGame(){
+  gen++; thinking=false; botInfo='';
+  st=fresh(); stack=[];
+  syncControls(); render(); maybeBot();
+}
+function syncControls(){
+  for(const [id,val] of [['segMode',mode],['segLevel',level],['segSide',human]]){
+    document.querySelectorAll('#'+id+' button').forEach(btn=>
+      btn.setAttribute('aria-pressed',String(btn.dataset.v===val)));
+  }
+  document.getElementById('botOpts').hidden=mode!=='bot';
+}
+document.getElementById('segMode').addEventListener('click',e=>{
+  const v=e.target.closest('button')?.dataset.v; if(v&&v!==mode){mode=v;newGame();}
+});
+document.getElementById('segLevel').addEventListener('click',e=>{
+  const v=e.target.closest('button')?.dataset.v; if(v&&v!==level){level=v;newGame();}
+});
+document.getElementById('segSide').addEventListener('click',e=>{
+  const v=e.target.closest('button')?.dataset.v; if(v&&v!==human){human=v;newGame();}
+});
+undoBtn.addEventListener('click',()=>{
+  if(thinking||!stack.length) return;
+  gen++; botInfo='';
+  if(mode==='bot'){
+    do{ st=stack.pop(); }while(st.turn!==human&&stack.length);
+  } else { st=stack.pop(); }
+  render(); maybeBot();
+});
+document.getElementById('reset').addEventListener('click',newGame);
+newGame();
+</script>
+</body>
+</html>
